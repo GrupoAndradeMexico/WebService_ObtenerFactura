@@ -1,0 +1,57 @@
+
+
+se publica con los pasos descritos de esta pagina:
+
+http://ltuttini.blogspot.mx/2012/10/aspnet-web-service-publicar-en-iis_21.html 
+
+
+Ejemplo de consumo: (pagina pc_ConsultaFactura.aspx)
+
+ RefMF.Service1SoapClient  obj = new RefMF.Service1SoapClient();
+            //byte[] pdfBytearray = obj.MuestraFactura("ZMO841221BJ4", "X", "AA", "15070");
+            RefMF.ArrayOfBase64Binary facturasxvin = obj.BuscaFacturasXVin("TSMYA22S8FM176310");
+
+            int documentos = facturasxvin.Count;
+            //foreach (byte[] pdfBytearray in facturasxvin)
+            //{
+                byte[] pdfBytearray = facturasxvin[0];
+                Response.Clear();
+                MemoryStream ms = new MemoryStream(pdfBytearray);
+                Response.ContentType = "application/pdf";
+                Response.AddHeader("content-disposition", "attachment;filename=Documento.pdf");
+                Response.Buffer = true;
+                ms.WriteTo(Response.OutputStream);
+                Response.End();
+            //}
+
+			
+https://codigofuentenet.wordpress.com/2014/03/02/se-ha-excedido-la-cuota-de-tamao-mximo-de-los-mensajes-entrantes65536-maxrevceivedmessagesize/
+
+Es necesario agregar estos valores al web.config del sitio donde se consuma el web service (en este caso la pagina: pc_ConsultaFactura.aspx que es ejemplo de consumo) para evitar el error de:
+"se ha excedido-la-cuota-de-tamao-mximo-de-los-mensajes-entrantes65536"
+lo siguiente va al web.config
+
+       <system.serviceModel>
+           <bindings>
+               <basicHttpBinding>
+                   <binding name="Service1Soap" maxBufferSize="5242880" maxReceivedMessageSize="5242880">
+				      <readerQuotas maxDepth="32" maxStringContentLength="5242880" maxArrayLength="5242880" maxBytesPerRead="4096" maxNameTableCharCount="5242880" />
+				   </binding>
+               </basicHttpBinding>
+           </bindings>
+           <client>
+               <endpoint address="http://192.168.20.41:8095/Service1.asmx" binding="basicHttpBinding"
+                   bindingConfiguration="Service1Soap" contract="RefMF.Service1Soap"
+                   name="Service1Soap" />
+           </client>
+       </system.serviceModel>
+
+
+--- de hecho solo sustituir : /> de
+
+<binding name="Service1Soap" /> por 
+
+
+maxBufferSize="5242880" maxReceivedMessageSize="5242880">
+				      <readerQuotas maxDepth="32" maxStringContentLength="5242880" maxArrayLength="5242880" maxBytesPerRead="4096" maxNameTableCharCount="5242880" />
+				   </binding>

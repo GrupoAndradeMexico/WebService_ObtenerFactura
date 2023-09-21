@@ -1,0 +1,5 @@
+C:\Digitalizacion\NuevaVersion\BP_DiseñoDeLaArquitecturaCXP\Desarrollo\WS_GETINVOICE\WS_GETINVOICE\bin\WS_GETINVOICE.dll
+C:\Digitalizacion\NuevaVersion\BP_DiseñoDeLaArquitecturaCXP\Desarrollo\WS_GETINVOICE\WS_GETINVOICE\bin\WS_GETINVOICE.pdb
+C:\Digitalizacion\NuevaVersion\BP_DiseñoDeLaArquitecturaCXP\Desarrollo\WS_GETINVOICE\WS_GETINVOICE\obj\Release\WS_GETINVOICE.csprojResolveAssemblyReference.cache
+C:\Digitalizacion\NuevaVersion\BP_DiseñoDeLaArquitecturaCXP\Desarrollo\WS_GETINVOICE\WS_GETINVOICE\obj\Release\WS_GETINVOICE.dll
+C:\Digitalizacion\NuevaVersion\BP_DiseñoDeLaArquitecturaCXP\Desarrollo\WS_GETINVOICE\WS_GETINVOICE\obj\Release\WS_GETINVOICE.pdb
