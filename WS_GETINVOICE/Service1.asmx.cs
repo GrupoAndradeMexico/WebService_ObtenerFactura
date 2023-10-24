@@ -71,6 +71,7 @@ namespace WS_GETINVOICE
         //20221228 SE agregan metodos para recuperar el xml de la factura y ambos pdf y xml en ObtenerFactura
         //20230412 se registra xml y pdf en la subcarpeta de cada AñoMes este comportamiento es a partir de la fecha configurada en TRANSMISION ! fechasubclasif 
         //20230621 se crea el metodo SISCO para identificar la procedencia del método y si el consumo del web service viene por este método no colocar marca de agua al pdf.
+        //20231023 Cuando BPRO en la tabla ADE_VTACFD coloca la factura en TODAS las agencias de un mismo RFC (Empresa), el pdf y xml debe buscarlo en la ruta de archivos pdf y xml exahustivamente hasta encontrarlo.
 
         string StringConnection = ConfigurationManager.AppSettings["ConnectionString"].ToString(); //"Data Source=192.168.20.59;Initial Catalog=PortalClientes;User ID=sa;Password=S0p0rt3";
         string StringConnectionBP = "Data Source={0};Initial Catalog={1};User ID={2};Password={3}";
@@ -340,59 +341,58 @@ namespace WS_GETINVOICE
                                       }
 
                                       RutaPdf = TraeArchivo(strUsrRemoto.Trim(), strPassRemoto.Trim(), strIPFileStorage.Trim(), RutaRemotaPDF);
-
-                                      //20220726 if (passFile != "0" && passFile != "") se agrega && RutaPdf.IndexOf("ERROR:") == -1 para que cuando no encuentre el archivo en la primer ruta siga buscando exaustivamente en las rutas de las demás agencias de la marca.
-                                      if (passFile != "0" && passFile != "" && RutaPdf.IndexOf("ERROR:") == -1)
+                                      if (RutaPdf.IndexOf("ERROR:") == -1) //20231023 No encontro el archivo pdf en esta agencia debe ir a buscar a la siguiente
                                       {
+                                              //20220726 if (passFile != "0" && passFile != "") se agrega && RutaPdf.IndexOf("ERROR:") == -1 para que cuando no encuentre el archivo en la primer ruta siga buscando exaustivamente en las rutas de las demás agencias de la marca.
+                                              if (passFile != "0" && passFile != "" && RutaPdf.IndexOf("ERROR:") == -1)
+                                              {
+                                                  PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf, passFile, PdfDocumentOpenMode.Modify, null);
+                                                  bool hasOwnerAccess = document.SecuritySettings.HasOwnerPermissions;
+                                                  document.Save(RutaPdf);
+                                              }
 
-                                          PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf, passFile, PdfDocumentOpenMode.Modify, null);
-                                          bool hasOwnerAccess = document.SecuritySettings.HasOwnerPermissions;
-                                          document.Save(RutaPdf);
+                                              if (RutaPdf.IndexOf("ERROR:") == -1 && File.Exists(RutaPdf))
+                                              {//Ya la encontramos ahora validamos si está cancelada
+                                                  Q = "Select Count(*) FROM ADE_CANCFD cfdscancelados where CDE_SERIE='" + SERIE.Trim() + "' and CDE_FOLIO = '" + FOLIO.Trim() + "'";
+                                                  if (objDBBP.ConsultaUnSoloCampo(Q).Trim() == "1")
+                                                  {
+                                                      //20201122 
+                                                      PonMarcaDeAgua(RutaPdf, "CANCELADA");
+                                                      objRegresar.mensajeresultado = "El documento " + SERIE.Trim() + FOLIO.Trim() + " está cancelado ";
+                                                  }
+                                                  else
+                                                  {
+                                                      //20221223 
+                                                      if (RFCEMISOR.ToUpper().Trim() != "CBR080923A2A" && RFCEMISOR.ToUpper().Trim() != "FGA161114294" && RFCRECEPTOR.ToUpper().Trim() != "SISCO")
+                                                            PonMarcaDeAgua(RutaPdf, "SIN VALOR COMERCIAL");
+                                                  }
 
-                                      }
+                                                  /*colocamos nuevamnete la seguridad*/
+                                                  if (passFile != "0" && passFile != "")
+                                                  {
+                                                      PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf);
+                                                      PdfSecuritySettings securitySettings = document.SecuritySettings;
+                                                      securitySettings.OwnerPassword = passFile;
+                                                      securitySettings.PermitAccessibilityExtractContent = false;
+                                                      securitySettings.PermitAnnotations = false;
+                                                      securitySettings.PermitAssembleDocument = false;
+                                                      securitySettings.PermitExtractContent = false;
+                                                      securitySettings.PermitFormsFill = false;
+                                                      securitySettings.PermitFullQualityPrint = false;
+                                                      securitySettings.PermitModifyDocument = false;
+                                                      securitySettings.PermitPrint = true;
+                                                      document.Save(RutaPdf);
+                                                  }
 
-                                      if (RutaPdf.IndexOf("ERROR:") == -1 && File.Exists(RutaPdf))
-                                      {//Ya la encontramos ahora validamos si está cancelada
-                                          Q = "Select Count(*) FROM ADE_CANCFD cfdscancelados where CDE_SERIE='" + SERIE.Trim() + "' and CDE_FOLIO = '" + FOLIO.Trim() + "'";
-                                          if (objDBBP.ConsultaUnSoloCampo(Q).Trim() == "1")
-                                          {
-                                              //20201122 
-                                              PonMarcaDeAgua(RutaPdf, "CANCELADA");
-                                              objRegresar.mensajeresultado = "El documento " + SERIE.Trim() + FOLIO.Trim() + " está cancelado ";
-                                          }
-                                          else
-                                          {
-                                              //20221223 
-                                              if (RFCEMISOR.ToUpper().Trim() != "CBR080923A2A" && RFCEMISOR.ToUpper().Trim() != "FGA161114294" && RFCRECEPTOR.ToUpper().Trim() != "SISCO")
-                                                    PonMarcaDeAgua(RutaPdf, "SIN VALOR COMERCIAL");
-                                          }
-
-                                          /*colocamos nuevamnete la seguridad*/
-                                          if (passFile != "0" && passFile != "")
-                                          {
-                                              PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf);
-                                              PdfSecuritySettings securitySettings = document.SecuritySettings;
-                                              securitySettings.OwnerPassword = passFile;
-                                              securitySettings.PermitAccessibilityExtractContent = false;
-                                              securitySettings.PermitAnnotations = false;
-                                              securitySettings.PermitAssembleDocument = false;
-                                              securitySettings.PermitExtractContent = false;
-                                              securitySettings.PermitFormsFill = false;
-                                              securitySettings.PermitFullQualityPrint = false;
-                                              securitySettings.PermitModifyDocument = false;
-                                              securitySettings.PermitPrint = true;
-                                              document.Save(RutaPdf);
-                                          }
-
-                                          break;
-                                      }
-
+                                                  break;
+                                              }
+                                    } //de si encontró el archivo
                                   }//de si existe el documento en la tabla de BPRo.
                                   else
                                   {
                                       RutaPdf = "ERROR: No se encontró registro en BD del documento: Serie = " + SERIE + " Folio = " + FOLIO;
                                   }
-                              } //del for de cada registro de TRANSMISION
+                              } //del if reg != null
                           } //del if de la consulta sobre TRANSMISION si viene vacio.
                           else {
                               RutaPdf = "ERROR: No se encontró registro en TRANSMISION para la agencia: " + reg1["id_agencia"].ToString().Trim();
@@ -943,62 +943,65 @@ namespace WS_GETINVOICE
                                 }
 
                                 RutaPdf = TraeArchivo(strUsrRemoto.Trim(), strPassRemoto.Trim(), strIPFileStorage.Trim(), RutaRemotaPDF);
-                                if (passFile != "0" && passFile != "")
-                                {
-                                    PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf, passFile, PdfDocumentOpenMode.Modify, null);
-                                    bool hasOwnerAccess = document.SecuritySettings.HasOwnerPermissions;
-                                    document.Save(RutaPdf);
-                                }
-                                if (RutaPdf.IndexOf("ERROR:") == -1 && File.Exists(RutaPdf))
-                                {
-                                    Q = "Select Count(*) FROM ADE_CANCFD cfdscancelados where CDE_SERIE='" + SERIE.Trim() + "' and CDE_FOLIO = '" + FOLIO.Trim() + "'";
-                                    if (objDBBP.ConsultaUnSoloCampo(Q).Trim() == "1")
-                                    {
-                                        PonMarcaDeAgua(RutaPdf, "CANCELADA");
-                                        objRegresar.mensajeresultado = "El documento " + SERIE.Trim() + FOLIO.Trim() + " está cancelado ";
-                                    }
-                                    else
-                                    {
-                                        //20221223 
-                                        if (RFCEMISOR.ToUpper().Trim() != "CBR080923A2A" && RFCEMISOR.ToUpper().Trim() != "FGA161114294" && RFCRECEPTOR.ToUpper().Trim() != "SISCO")
-                                            PonMarcaDeAgua(RutaPdf, "SIN VALOR COMERCIAL");
-                                    }
-
+                                if (RutaPdf.IndexOf("ERROR:") == -1) //20231023 No encontro el archivo pdf en esta agencia debe ir a buscar a la siguiente
+                                {                                                                                                    
                                     if (passFile != "0" && passFile != "")
                                     {
-                                        PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf);
-                                        PdfSecuritySettings securitySettings = document.SecuritySettings;
-                                        securitySettings.OwnerPassword = passFile;
-                                        securitySettings.PermitAccessibilityExtractContent = false;
-                                        securitySettings.PermitAnnotations = false;
-                                        securitySettings.PermitAssembleDocument = false;
-                                        securitySettings.PermitExtractContent = false;
-                                        securitySettings.PermitFormsFill = false;
-                                        securitySettings.PermitFullQualityPrint = false;
-                                        securitySettings.PermitModifyDocument = false;
-                                        securitySettings.PermitPrint = true;
+                                        PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf, passFile, PdfDocumentOpenMode.Modify, null);
+                                        bool hasOwnerAccess = document.SecuritySettings.HasOwnerPermissions;
                                         document.Save(RutaPdf);
                                     }
-                                    //break;
-                                }
+                                    if (RutaPdf.IndexOf("ERROR:") == -1 && File.Exists(RutaPdf))
+                                    {
+                                        Q = "Select Count(*) FROM ADE_CANCFD cfdscancelados where CDE_SERIE='" + SERIE.Trim() + "' and CDE_FOLIO = '" + FOLIO.Trim() + "'";
+                                        if (objDBBP.ConsultaUnSoloCampo(Q).Trim() == "1")
+                                        {
+                                            PonMarcaDeAgua(RutaPdf, "CANCELADA");
+                                            objRegresar.mensajeresultado = "El documento " + SERIE.Trim() + FOLIO.Trim() + " está cancelado ";
+                                        }
+                                        else
+                                        {
+                                            //20221223 
+                                            if (RFCEMISOR.ToUpper().Trim() != "CBR080923A2A" && RFCEMISOR.ToUpper().Trim() != "FGA161114294" && RFCRECEPTOR.ToUpper().Trim() != "SISCO")
+                                                PonMarcaDeAgua(RutaPdf, "SIN VALOR COMERCIAL");
+                                        }
 
-                                string RutaRemotaXML = "\\\\" + strIPFileStorage.Trim() + "\\" + strDirectorioRemotoXML.Trim() + "\\" + vde_docto.Trim() + ".xml";
+                                        if (passFile != "0" && passFile != "")
+                                        {
+                                            PdfSharp.Pdf.PdfDocument document = PdfSharp.Pdf.IO.PdfReader.Open(RutaPdf);
+                                            PdfSecuritySettings securitySettings = document.SecuritySettings;
+                                            securitySettings.OwnerPassword = passFile;
+                                            securitySettings.PermitAccessibilityExtractContent = false;
+                                            securitySettings.PermitAnnotations = false;
+                                            securitySettings.PermitAssembleDocument = false;
+                                            securitySettings.PermitExtractContent = false;
+                                            securitySettings.PermitFormsFill = false;
+                                            securitySettings.PermitFullQualityPrint = false;
+                                            securitySettings.PermitModifyDocument = false;
+                                            securitySettings.PermitPrint = true;
+                                            document.Save(RutaPdf);
+                                        }
+                                        //break;
+                                    }
 
-                                if (Convert.ToDouble(fechaopeu) >= Convert.ToDouble(fechasubclasif) && Convert.ToDouble(fechasubclasif) != 19000101)
-                                { //20230412 se registra en la subcarpeta de cada AñoMes 
-                                    string AnioFactura = fechaopeu.Substring(0, 4);
-                                    string MesFactura = fechaopeu.Substring(4, 2);
-                                    RutaRemotaXML = string.Format("\\\\{0}\\{1}\\{3}{4}\\{2}.xml", strIPFileStorage, strDirectorioRemotoXML, vde_docto.Trim(), AnioFactura, MesFactura);
-                                }                                
+                                    string RutaRemotaXML = "\\\\" + strIPFileStorage.Trim() + "\\" + strDirectorioRemotoXML.Trim() + "\\" + vde_docto.Trim() + ".xml";
+
+                                    if (Convert.ToDouble(fechaopeu) >= Convert.ToDouble(fechasubclasif) && Convert.ToDouble(fechasubclasif) != 19000101)
+                                    { //20230412 se registra en la subcarpeta de cada AñoMes 
+                                        string AnioFactura = fechaopeu.Substring(0, 4);
+                                        string MesFactura = fechaopeu.Substring(4, 2);
+                                        RutaRemotaXML = string.Format("\\\\{0}\\{1}\\{3}{4}\\{2}.xml", strIPFileStorage, strDirectorioRemotoXML, vde_docto.Trim(), AnioFactura, MesFactura);
+                                    }                                
                                 
-                                RutaXml = TraeArchivo(strUsrRemoto.Trim(), strPassRemoto.Trim(), strIPFileStorage.Trim(), RutaRemotaXML);
-                                break;
-                            }
+                                    RutaXml = TraeArchivo(strUsrRemoto.Trim(), strPassRemoto.Trim(), strIPFileStorage.Trim(), RutaRemotaXML);
+                                    break;
+                                } //Del If de si encontró el archivo PDF en la ruta de archivos pdf de esta agencia
+                            } //Del if de vde_docto.Trim() != ""
                             else
                             {
                                 RutaPdf = "ERROR: No se encontró registro en BD del documento: Serie = " + SERIE + " Folio = " + FOLIO;
                             }
-                        }
+                        }//Del ForEach de cada agencia con el RFC.
                     }
                     else
                     {
