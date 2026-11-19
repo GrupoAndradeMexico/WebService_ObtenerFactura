@@ -240,6 +240,9 @@ namespace WS_GETINVOICE
 
                   //string Q = "select * from TRANSMISION WHERE id_agencia in (select id_agencia from BP_SERIES_BUSQUEDA where id_serie='" + SERIE.ToUpper().Trim() + "' AND ID_AGENCIA in (select id_agencia from AGENCIAS where rfc='" + RFCEMISOR.ToUpper().Trim() + "'))";
                   string Q = "select id_agencia from AGENCIAS where rfc='" + RFCEMISOR.ToUpper().Trim() + "'";
+                    if (RFCEMISOR.ToUpper().Trim() == "AUT991215UZ2") {
+                        Q = Q + "UNION SELECT -1";
+                    }
                   DataSet ds = this.objDB.Consulta(Q);
                   //if (ds != null && ds.Tables.Count > 0 && ds.Tables[0].Rows.Count > 0) //20221116
                   if (!this.objDB.EstaVacio(ds))
@@ -250,7 +253,14 @@ namespace WS_GETINVOICE
                           
                           Q = "select ";                          
                           Q += " id_agencia, ip, usr_bd, pass_bd, nombre_bd, ip_almacen_archivos, dir_remoto_xml, dir_remoto_pdf, usr_remoto, pass_remoto, smtpserverhost, smtpport, usrcredential, usrpassword, visible, bd_alterna, plantillaHTML, logo, cuenta_from, enable_ssl, isnull(Convert(char(8),fechasubclasif,112),'19000101') as fechasubclasif ";
-                          Q += " from TRANSMISION WHERE  id_agencia='" + reg1["id_agencia"].ToString().Trim() + "'";
+                            if (reg1["id_agencia"].ToString().Trim() == "-1")
+                            {
+                                Q += " from TRANSMISION WHERE  id_agencia='11'";
+                            }
+                            else {
+
+                                Q += " from TRANSMISION WHERE  id_agencia='" + reg1["id_agencia"].ToString().Trim() + "'";
+                            }
 
                           DataSet ds1 = this.objDB.Consulta(Q);
                           if (!this.objDB.EstaVacio(ds1))
@@ -263,6 +273,9 @@ namespace WS_GETINVOICE
                                   ConexionBD objDBBP = new ConexionBD(StringConnectionBP_AUX);
 
                                   string id_agencia = reg["id_agencia"].ToString().Trim();
+                                    if (id_agencia == "-1") {
+                                        id_agencia = "11";
+                                    }
 
                                   //consultamos si existe el registro del documento en la base de datos local de Bpro
                                   Q = "select VDE_DOCTO as archivo, VDE_FECHOPE as fecha, Convert(char(8),Convert(datetime,VDE_FECHOPE),112) as fechaopeu from ADE_VTACFD";
@@ -314,7 +327,7 @@ namespace WS_GETINVOICE
                                           strDirectorioRemotoXML = regConexion["dir_remoto_xml"].ToString().Trim();
                                           strDirectorioRemotoPDF = regConexion["dir_remoto_pdf"].ToString().Trim();
                                           strIPFileStorage = regConexion["ip_almacen_archivos"].ToString().Trim();
-                                      }
+                                        }
                                   }
                                   //else
                                   //{ //esta en el servidor original
@@ -338,7 +351,12 @@ namespace WS_GETINVOICE
                                           string AnioFactura = fechaopeu.Substring(0, 4);
                                           string MesFactura = fechaopeu.Substring(4, 2);
                                           RutaRemotaPDF = string.Format("\\\\{0}\\{1}\\{3}{4}\\{2}.pdf", strIPFileStorage, strDirectorioRemotoPDF, vde_docto.Trim(), AnioFactura, MesFactura);
-                                      }
+
+                                            if (reg1["id_agencia"].ToString().Trim() == "-1")
+                                            {
+                                                RutaRemotaPDF = RutaRemotaPDF.Replace(@"Pdf\", @"Pdf\AUTOANGAR");
+                                            }
+                                        }
 
                                       RutaPdf = TraeArchivo(strUsrRemoto.Trim(), strPassRemoto.Trim(), strIPFileStorage.Trim(), RutaRemotaPDF);
                                       if (RutaPdf.IndexOf("ERROR:") == -1) //20231023 No encontro el archivo pdf en esta agencia debe ir a buscar a la siguiente
